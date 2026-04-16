@@ -12,6 +12,8 @@
 
   <artifactId>org.openhab.binding.ddwrt</artifactId>
 
+  <version>5.1.3.20260416</version>
+
   <name>openHAB Add-ons :: Bundles :: ddwrt Binding</name>
 
   <properties>

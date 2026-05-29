@@ -11,6 +11,7 @@
   </parent>
 
   <artifactId>org.openhab.binding.ddwrt</artifactId>
+  <!-- <version>5.1.5.202605291529</version> -->
 
   <name>openHAB Add-ons :: Bundles :: ddwrt Binding</name>
 

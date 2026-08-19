@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.sameInstance;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -129,6 +130,41 @@ class DDWRTNetworkCacheTest {
         updated = Objects.requireNonNull(updated);
         assertThat(updated.getHostname(), is(equalTo("Phone")));
         assertThat(updated.getIpAddress(), is(equalTo("192.168.1.50")));
+    }
+
+    @Test
+    void testComputeWirelessClientRemovesStaleDiscoveredHostnameIndex() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setOuiHostname("TPLink-ddeeff");
+        client.setDiscoveredHostname("Kitchen Lamp", "thing tplinksmarthome via mac");
+        cache.putWirelessClient(client.getMac(), client);
+
+        cache.computeWirelessClient(client.getMac(), current -> {
+            current.setDiscoveredHostname("", "");
+            return current;
+        });
+
+        assertThat(cache.getWirelessClientByHostname("Kitchen Lamp"), is(nullValue()));
+        assertThat(cache.getWirelessClientByHostname("TPLink-ddeeff"), is(notNullValue()));
+    }
+
+    @Test
+    void testDhcpHostnameOverridesDiscoveredHostname() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("HS103");
+        client.setDiscoveredHostname("Kitchen Lamp", "thing tplinksmarthome via mac");
+
+        assertThat(client.getHostname(), is(equalTo("HS103")));
+        assertThat(client.getPrimaryHostname(), is(equalTo("HS103")));
+    }
+
+    @Test
+    void testFindsFriendlyNameByDnsSafeHostname() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setDiscoveredHostname("Jack's Living Room TV", "mDNS discovery via mac");
+        cache.putWirelessClient(client.getMac(), client);
+
+        assertThat(cache.getWirelessClientByHostname("jacks-living-room-tv"), is(sameInstance(client)));
     }
 
     // ---- MAC randomization merge ----

@@ -36,6 +36,19 @@ After adding and configuring the `network` bridge, the binding automatically dis
 
 Discovery results appear in the openHAB inbox after each device refresh cycle.
 
+### Client Name Enrichment
+
+When a router does not provide a client hostname, the binding can use a name learned from another openHAB Thing or
+from local-network discovery. Exact MAC-address matches are preferred; IP-address matches are only used when the
+router's current ARP entry confirms the association and the discovered name is unambiguous.
+
+The binding also collects names advertised by legacy TP-Link/Kasa UDP discovery, selected mDNS services (including
+Apple and Fire TV devices), and WeMo UPnP devices. Router-provided names and explicit `hostnameMappings` always take
+precedence. An OUI-based name such as `TPLink-a3a012` remains the final fallback for a globally assigned MAC address.
+
+Friendly names containing spaces or punctuation are retained as inbox labels. The required `hostname` property is
+converted to a lowercase DNS-safe label, for example `Jack's Living Room TV` becomes `jacks-living-room-tv`.
+
 ## Quick Start
 
 1. **Enable SSH** on your router (see [Firmware SSH Setup](#firmware-ssh-setup) below)

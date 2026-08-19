@@ -260,7 +260,15 @@ public class DDWRTNetworkCache {
     public DDWRTClient computeWirelessClient(String mac, WirelessClientMapper mappingFunction) {
         DDWRTClient result = Objects.requireNonNull(wirelessClientsByMac.compute(normalizeMac(mac), (key, existing) -> {
             DDWRTClient client = existing != null ? existing : new DDWRTClient(key);
+            String previousHostname = client.getHostname();
+            String previousOuiHostname = client.getOuiHostname();
             DDWRTClient updated = mappingFunction.apply(client);
+            if (!previousHostname.isEmpty() && !previousHostname.equalsIgnoreCase(updated.getHostname())) {
+                hostnameToMac.remove(previousHostname.toLowerCase(Locale.ROOT), key);
+            }
+            if (!previousOuiHostname.isEmpty() && !previousOuiHostname.equalsIgnoreCase(updated.getOuiHostname())) {
+                hostnameToMac.remove(previousOuiHostname.toLowerCase(Locale.ROOT), key);
+            }
             // Maintain hostname index - include both hostname and ouiHostname
             if (!updated.getHostname().isEmpty()) {
                 hostnameToMac.put(Objects.requireNonNull(updated.getHostname().toLowerCase(Locale.ROOT)), key);
@@ -289,8 +297,9 @@ public class DDWRTNetworkCache {
             return wirelessClientsByMac.get(mac);
         }
         // Try sanitized form to match thing IDs (e.g., "leepixel8a" -> "lee-pixel-8a")
+        String sanitizedHostname = hostname.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         for (Map.Entry<String, String> entry : hostnameToMac.entrySet()) {
-            if (entry.getKey().replaceAll("[^a-z0-9]", "").equals(hostname.toLowerCase(Locale.ROOT))) {
+            if (entry.getKey().replaceAll("[^a-z0-9]", "").equals(sanitizedHostname)) {
                 return wirelessClientsByMac.get(entry.getValue());
             }
         }

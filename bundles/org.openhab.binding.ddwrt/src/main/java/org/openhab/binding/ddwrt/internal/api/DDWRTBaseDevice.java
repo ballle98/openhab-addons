@@ -1108,6 +1108,7 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
 
         refreshRadios(runner);
         refreshWirelessClients(runner);
+        applyOuiHostnames();
         classifyWiredClients();
         computeDeviceWirelessCount();
         if (isGateway()) {
@@ -1779,15 +1780,6 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                         }
                     }
 
-                    // Last resort: generate hostname from OUI vendor prefix (skip randomized MACs)
-                    if (client.getHostname().isEmpty() && !OuiDatabase.isRandomizedMac(clientMac)) {
-                        String generated = OuiDatabase.generateHostname(clientMac);
-                        if (!generated.isEmpty()) {
-                            client.setOuiHostname(generated);
-                            logger.debug("Generated OUI hostname for {}: {}", clientMac, generated);
-                        }
-                    }
-
                     return client;
                 });
 
@@ -1820,6 +1812,33 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
         }
 
         logger.debug("Refreshed wireless clients: {} total", totalClients);
+    }
+
+    /**
+     * Apply the last-resort OUI name to every client in the shared cache, including clients learned only from the
+     * gateway DHCP lease or ARP table. Those clients do not necessarily appear in a configured radio's association
+     * list, so applying the fallback only in {@link #refreshWirelessClients(SshRunner)} leaves wired and remote-AP
+     * clients unnamed.
+     */
+    protected void applyOuiHostnames() {
+        DDWRTNetworkCache cache = networkCache;
+        if (cache == null) {
+            return;
+        }
+        for (DDWRTClient client : cache.getWirelessClients()) {
+            String clientMac = client.getMac();
+            if (client.getPrimaryHostname().isEmpty() && client.getOuiHostname().isEmpty()
+                    && !OuiDatabase.isRandomizedMac(clientMac)) {
+                String generated = OuiDatabase.generateHostname(clientMac);
+                if (!generated.isEmpty()) {
+                    cache.computeWirelessClient(clientMac, current -> {
+                        current.setOuiHostname(generated);
+                        return current;
+                    });
+                    logger.debug("Generated OUI hostname for {}: {}", clientMac, generated);
+                }
+            }
+        }
     }
 
     /**

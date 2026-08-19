@@ -31,6 +31,8 @@ public class DDWRTClient {
 
     private String mac;
     private String hostname = "";
+    private String discoveredHostname = "";
+    private String discoveredHostnameSource = "";
     private String ouiHostname = "";
     private String ipAddress = "";
     private String apMac = "";
@@ -56,7 +58,7 @@ public class DDWRTClient {
     }
 
     public String getHostname() {
-        return !hostname.isEmpty() ? hostname : ouiHostname;
+        return !hostname.isEmpty() ? hostname : !discoveredHostname.isEmpty() ? discoveredHostname : ouiHostname;
     }
 
     public String getPrimaryHostname() {
@@ -65,6 +67,14 @@ public class DDWRTClient {
 
     public String getOuiHostname() {
         return ouiHostname;
+    }
+
+    public String getDiscoveredHostname() {
+        return discoveredHostname;
+    }
+
+    public String getDiscoveredHostnameSource() {
+        return discoveredHostnameSource;
     }
 
     public String getIpAddress() {
@@ -133,6 +143,11 @@ public class DDWRTClient {
 
     public void setOuiHostname(String ouiHostname) {
         this.ouiHostname = ouiHostname;
+    }
+
+    public void setDiscoveredHostname(String discoveredHostname, String source) {
+        this.discoveredHostname = discoveredHostname;
+        this.discoveredHostnameSource = discoveredHostname.isEmpty() ? "" : source;
     }
 
     public void setIpAddress(String ipAddress) {

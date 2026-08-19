@@ -39,4 +39,15 @@ class DDWRTDiscoveryServiceTest {
         assertThat(thingUid.getId(), is("24-f5-a2-c6-16-59-wlan0-1"));
         assertThat(radio.getInterfaceId(), is("24:f5:a2:c6:16:59:wlan0.1"));
     }
+
+    @Test
+    void createsDnsSafeHostnameWithoutChangingDisplayName() {
+        assertThat(DDWRTDiscoveryService.toHostname("Jack's Living Room TV"), is("jacks-living-room-tv"));
+        assertThat(DDWRTDiscoveryService.toHostname("  Café -- Roku!  "), is("cafe-roku"));
+    }
+
+    @Test
+    void limitsHostnameToOneDnsLabel() {
+        assertThat(DDWRTDiscoveryService.toHostname("A".repeat(70)).length(), is(63));
+    }
 }

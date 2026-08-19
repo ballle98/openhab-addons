@@ -39,11 +39,14 @@ public final class OuiDatabase {
             // Amazon
             Map.entry("00:fc:8b", "Amazon"), Map.entry("10:2c:6b", "Amazon"), Map.entry("14:91:82", "Amazon"),
             Map.entry("18:74:2e", "Amazon"), Map.entry("34:d2:70", "Amazon"), Map.entry("38:f7:3d", "Amazon"),
-            Map.entry("40:a2:db", "Amazon"), Map.entry("44:65:0d", "Amazon"), Map.entry("4c:ef:c0", "Amazon"),
-            Map.entry("50:dc:e7", "Amazon"), Map.entry("68:37:e9", "Amazon"), Map.entry("68:54:fd", "Amazon"),
-            Map.entry("74:c2:46", "Amazon"), Map.entry("84:d6:d0", "Amazon"), Map.entry("a4:08:ea", "Amazon"),
-            Map.entry("b4:7c:9c", "Amazon"), Map.entry("f0:f0:a4", "Amazon"), Map.entry("fc:65:de", "Amazon"),
-            Map.entry("0c:47:c9", "Amazon"),
+            Map.entry("40:a2:db", "Amazon"), Map.entry("44:3d:54", "Amazon"), Map.entry("44:65:0d", "Amazon"),
+            Map.entry("4c:ef:c0", "Amazon"), Map.entry("50:dc:e7", "Amazon"), Map.entry("68:37:e9", "Amazon"),
+            Map.entry("68:54:fd", "Amazon"), Map.entry("70:70:aa", "Amazon"), Map.entry("74:c2:46", "Amazon"),
+            Map.entry("74:d4:23", "Amazon"), Map.entry("84:28:59", "Amazon"), Map.entry("84:d6:d0", "Amazon"),
+            Map.entry("a4:08:ea", "Amazon"), Map.entry("b4:7c:9c", "Amazon"), Map.entry("f0:2f:9e", "Amazon"),
+            Map.entry("f0:f0:a4", "Amazon"), Map.entry("fc:65:de", "Amazon"), Map.entry("0c:47:c9", "Amazon"),
+            // Blink by Amazon
+            Map.entry("74:ab:93", "Blink"),
             // Apple
             Map.entry("00:17:f2", "Apple"), Map.entry("00:1c:b3", "Apple"), Map.entry("00:25:bc", "Apple"),
             Map.entry("04:0c:ce", "Apple"), Map.entry("08:66:98", "Apple"), Map.entry("10:dd:b1", "Apple"),
@@ -100,12 +103,20 @@ public final class OuiDatabase {
             Map.entry("98:da:c4", "TPLink"), Map.entry("a0:92:08", "TPLink"), Map.entry("ac:84:c6", "TPLink"),
             Map.entry("b0:4e:26", "TPLink"), Map.entry("b0:95:75", "TPLink"), Map.entry("c0:06:c3", "TPLink"),
             Map.entry("c0:e3:fb", "TPLink"), Map.entry("d8:07:b6", "TPLink"), Map.entry("d8:47:32", "TPLink"),
-            Map.entry("e8:48:b8", "TPLink"), Map.entry("e8:fc:af", "TPLink"), Map.entry("f0:2f:9e", "TPLink"),
-            Map.entry("f0:a7:31", "TPLink"), Map.entry("b0:19:21", "TPLink"),
+            Map.entry("e8:48:b8", "TPLink"), Map.entry("e8:fc:af", "TPLink"), Map.entry("f0:a7:31", "TPLink"),
+            Map.entry("b0:19:21", "TPLink"), Map.entry("3c:6a:d2", "TPLink"),
             // Roku
-            Map.entry("b0:a7:37", "Roku"), Map.entry("b8:3e:59", "Roku"), Map.entry("c8:3a:6b", "Roku"),
-            Map.entry("d0:4d:c6", "Roku"), Map.entry("dc:3a:5e", "Roku"), Map.entry("84:ea:ed", "Roku"),
-            Map.entry("ac:3a:7a", "Roku"),
+            Map.entry("00:0d:4b", "Roku"), Map.entry("08:05:81", "Roku"), Map.entry("10:59:32", "Roku"),
+            Map.entry("20:ef:bd", "Roku"), Map.entry("34:5e:08", "Roku"), Map.entry("50:06:f5", "Roku"),
+            Map.entry("54:4e:f0", "Roku"), Map.entry("60:92:c8", "Roku"), Map.entry("7c:67:ab", "Roku"),
+            Map.entry("84:ea:ed", "Roku"), Map.entry("88:de:a9", "Roku"), Map.entry("8a:c7:2e", "Roku"),
+            Map.entry("8c:49:62", "Roku"), Map.entry("9c:f1:d4", "Roku"), Map.entry("a8:b5:7c", "Roku"),
+            Map.entry("ac:3a:7a", "Roku"), Map.entry("ac:ae:19", "Roku"), Map.entry("b0:a7:37", "Roku"),
+            Map.entry("b0:ee:7b", "Roku"), Map.entry("b8:3e:59", "Roku"), Map.entry("b8:a1:75", "Roku"),
+            Map.entry("bc:d7:d4", "Roku"), Map.entry("c8:3a:6b", "Roku"), Map.entry("cc:6d:a0", "Roku"),
+            Map.entry("d0:4d:2c", "Roku"), Map.entry("d4:be:dc", "Roku"), Map.entry("d4:e2:2f", "Roku"),
+            Map.entry("d8:31:34", "Roku"), Map.entry("dc:3a:5e", "Roku"), Map.entry("ec:9b:75", "Roku"),
+            Map.entry("f8:b2:2c", "Roku"),
             // LG Electronics
             Map.entry("00:1c:62", "LG"), Map.entry("00:1e:75", "LG"), Map.entry("00:aa:70", "LG"),
             Map.entry("10:f1:f2", "LG"), Map.entry("20:3d:bd", "LG"), Map.entry("2c:54:cf", "LG"),
@@ -136,7 +147,7 @@ public final class OuiDatabase {
             // Wyze
             Map.entry("2c:aa:8e", "Wyze"), Map.entry("d0:3f:27", "Wyze"),
             // Ring
-            Map.entry("44:3d:54", "Ring"), Map.entry("34:3e:a4", "Ring"),
+            Map.entry("34:3e:a4", "Ring"),
             // Ecobee
             Map.entry("44:61:32", "Ecobee"),
             // Chamberlain / MyQ
@@ -146,7 +157,7 @@ public final class OuiDatabase {
             // LIFX
             Map.entry("d0:73:d5", "LIFX"),
             // Tuya / Smart Life
-            Map.entry("10:d5:61", "Tuya"), Map.entry("7c:f6:66", "Tuya"),
+            Map.entry("10:d5:61", "Tuya"), Map.entry("7c:f6:66", "Tuya"), Map.entry("c0:f8:53", "Tuya"),
             // Espressif (ESP8266/ESP32)
             Map.entry("18:fe:34", "Espressif"), Map.entry("24:0a:c4", "Espressif"), Map.entry("24:62:ab", "Espressif"),
             Map.entry("2c:3a:e8", "Espressif"), Map.entry("30:ae:a4", "Espressif"), Map.entry("3c:61:05", "Espressif"),
@@ -203,8 +214,6 @@ public final class OuiDatabase {
             Map.entry("f0:9f:c2", "Ubiquiti"), Map.entry("fc:ec:da", "Ubiquiti"),
             // Liteon (often WiFi modules in laptops)
             Map.entry("30:52:cb", "Liteon"), Map.entry("00:26:18", "Liteon"),
-            // Qualcomm Atheros (WiFi chipset)
-            Map.entry("3c:6a:d2", "Atheros"),
             // Broadcom
             Map.entry("00:10:18", "Broadcom"), Map.entry("d8:b1:22", "Broadcom"),
             // Realtek
@@ -240,7 +249,7 @@ public final class OuiDatabase {
             Map.entry("04:52:c7", "Bose"), Map.entry("08:df:1f", "Bose"), Map.entry("2c:41:a1", "Bose"),
             Map.entry("4c:87:5d", "Bose"),
             // TCL
-            Map.entry("70:70:aa", "TCL"), Map.entry("d4:6a:6a", "TCL"),
+            Map.entry("d4:6a:6a", "TCL"),
             // Vizio
             Map.entry("d4:36:39", "Vizio"),
             // Hisense
@@ -251,10 +260,6 @@ public final class OuiDatabase {
             Map.entry("00:1b:a9", "Brother"), Map.entry("00:80:77", "Brother"),
             // Epson
             Map.entry("00:00:48", "Epson"), Map.entry("00:26:ab", "Epson"),
-            // Wistron (laptops/ODM for HP, Dell, etc.)
-            Map.entry("74:ab:93", "Wistron"),
-            // Pegatron (ODM for many PC brands)
-            Map.entry("74:d4:23", "Pegatron"),
             // Murata (WiFi module vendor)
             Map.entry("44:a7:cf", "Murata"), Map.entry("60:f1:89", "Murata"),
             // Texas Instruments (TI) - embedded/IoT
@@ -263,7 +268,7 @@ public final class OuiDatabase {
             // Shenzhen Bilian (smart plugs, IoT)
             Map.entry("e8:cf:83", "Bilian"),
             // AzureWave (WiFi modules, often in cameras/IoT)
-            Map.entry("74:da:88", "AzureWave"), Map.entry("b0:ee:45", "AzureWave"), Map.entry("84:28:59", "AzureWave"),
+            Map.entry("74:da:88", "AzureWave"), Map.entry("b0:ee:45", "AzureWave"),
             // Eero
             Map.entry("50:01:d9", "Eero"), Map.entry("f8:bb:bf", "Eero"),
             // Arris / Motorola Surfboard
@@ -308,12 +313,11 @@ public final class OuiDatabase {
     }
 
     /**
-     * Check if a MAC address has the locally-administered bit set,
-     * indicating it is a randomized/private MAC address.
-     * OUI lookup is not meaningful for randomized MACs.
+     * Check if a MAC address is likely randomized. A set locally-administered bit normally indicates a private MAC,
+     * but IEEE CID assignments such as Roku's 8A:C7:2E are vendor-specific locally-administered prefixes.
      *
      * @param mac full MAC address
-     * @return true if the MAC is locally administered (randomized)
+     * @return true if the MAC is locally administered and has no known vendor assignment
      */
     public static boolean isRandomizedMac(String mac) {
         if (mac.length() < 2) {
@@ -321,7 +325,7 @@ public final class OuiDatabase {
         }
         try {
             int firstByte = Integer.parseInt(mac.substring(0, 2), 16);
-            return (firstByte & 0x02) != 0;
+            return (firstByte & 0x02) != 0 && lookupVendor(mac) == null;
         } catch (NumberFormatException e) {
             return false;
         }

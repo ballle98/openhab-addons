@@ -14,16 +14,21 @@ package org.openhab.binding.ddwrt.internal;
 
 import static org.openhab.binding.ddwrt.internal.DDWRTBindingConstants.*;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.ddwrt.internal.api.DDWRTBaseDevice;
+import org.openhab.binding.ddwrt.internal.api.DDWRTClient;
 import org.openhab.binding.ddwrt.internal.api.DDWRTNetwork;
 import org.openhab.binding.ddwrt.internal.api.DDWRTNetworkCache;
 import org.openhab.binding.ddwrt.internal.api.RefreshListener;
@@ -32,6 +37,7 @@ import org.openhab.core.config.discovery.AbstractThingHandlerDiscoveryService;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.inbox.Inbox;
+import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingUID;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -60,6 +66,12 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
 
     @Reference
     private @Nullable Inbox inbox;
+
+    @Reference
+    private @Nullable ThingRegistry thingRegistry;
+
+    @Reference
+    private @Nullable ClientNameRegistry clientNameRegistry;
 
     public DDWRTDiscoveryService() {
         super(DDWRTNetworkBridgeHandler.class, SUPPORTED_THING_TYPES_UIDS, DISCOVERY_TIMEOUT_SECONDS);
@@ -195,23 +207,37 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
     private void discoverClients(DDWRTNetwork net) {
         final ThingUID bridgeUID = thingHandler.getThing().getUID();
         final DDWRTNetworkCache cache = net.getCache();
+        final ClientNameResolver nameResolver = createClientNameResolver();
 
-        cache.getWirelessClients().forEach(client -> {
-            if (client.getHostname().isEmpty()) {
+        for (DDWRTClient originalClient : cache.getWirelessClients()) {
+            DDWRTClient client = enrichClientName(cache, originalClient, nameResolver);
+            String label = client.getHostname();
+            if (label.isEmpty()) {
                 // Skip clients without a hostname — hostname is required for client things
                 logger.debug("Skipping client without hostname: MAC={}", client.getMac());
-                return;
+                continue;
             }
-            final String thingId = client.getHostname().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+            String hostname = toHostname(label);
+            if (hostname.isEmpty()) {
+                hostname = "client-" + client.getMac().replace(":", "");
+            }
+            final String thingId = hostname.replace("-", "");
             final ThingUID thingUID = new ThingUID(THING_TYPE_CLIENT, bridgeUID, thingId);
 
             logger.debug("Discovered client: '{}'", thingUID);
 
-            final Map<String, Object> props = new java.util.HashMap<>();
-            props.put(HOSTNAME, client.getHostname());
+            final Map<String, Object> props = new HashMap<>();
+            props.put(HOSTNAME, hostname);
+            props.put(MAC, client.getMac());
+            if (!client.getIpAddress().isEmpty()) {
+                props.put("ipAddress", client.getIpAddress());
+            }
+            if (!client.getDiscoveredHostnameSource().isEmpty()) {
+                props.put("hostnameSource", client.getDiscoveredHostnameSource());
+            }
 
             final DiscoveryResult result = DiscoveryResultBuilder.create(thingUID).withBridge(bridgeUID)
-                    .withLabel(client.getHostname()).withProperties(props)
+                    .withLabel(label).withProperties(props)
                     // Keep hostname as the representation property. Some clients use
                     // MAC randomization, so the MAC is not stable enough to be the primary
                     // representation key in the inbox/UI.
@@ -228,10 +254,56 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
             // Matching is intentionally by hostname OR MAC. Hostname remains the preferred
             // representation property because MAC randomization can cause the MAC to change
             // for some devices.
-            replacePendingClientInboxDuplicates(thingUID, client.getHostname(), client.getMac());
+            replacePendingClientInboxDuplicates(thingUID, hostname, client.getMac());
 
             thingDiscovered(result);
+        }
+    }
+
+    private ClientNameResolver createClientNameResolver() {
+        ClientNameResolver resolver = new ClientNameResolver();
+        ClientNameRegistry nameRegistryRef = clientNameRegistry;
+        if (nameRegistryRef != null) {
+            nameRegistryRef.addTo(resolver);
+        }
+        ThingRegistry registryRef = thingRegistry;
+        if (registryRef != null) {
+            registryRef.getAll().forEach(resolver::addThing);
+        }
+        Inbox inboxRef = inbox;
+        if (inboxRef != null) {
+            inboxRef.getAll().forEach(resolver::addDiscoveryResult);
+        }
+        return resolver;
+    }
+
+    private DDWRTClient enrichClientName(DDWRTNetworkCache cache, DDWRTClient client, ClientNameResolver nameResolver) {
+        // Router-provided names include explicit mappings, DHCP leases, and hosts-file entries. They are
+        // authoritative, so external discovery is only used when none of those sources supplied a name.
+        Optional<ClientNameResolver.Resolution> resolution = Optional.empty();
+        if (client.getPrimaryHostname().isEmpty()) {
+            String arpIp = Objects.requireNonNullElse(cache.getArpIp(client.getMac()), "");
+            String verifiedIp = arpIp.equals(client.getIpAddress()) ? arpIp : "";
+            resolution = nameResolver.resolve(client.getMac(), verifiedIp);
+        }
+        String discoveredName = Objects.requireNonNull(resolution.map(ClientNameResolver.Resolution::name).orElse(""));
+        String source = Objects.requireNonNull(resolution
+                .map(candidate -> candidate.source() + " via " + candidate.matchType().name().toLowerCase(Locale.ROOT))
+                .orElse(""));
+
+        if (discoveredName.equals(client.getDiscoveredHostname())
+                && source.equals(client.getDiscoveredHostnameSource())) {
+            return client;
+        }
+
+        DDWRTClient updated = cache.computeWirelessClient(client.getMac(), current -> {
+            current.setDiscoveredHostname(discoveredName, source);
+            return current;
         });
+        if (!discoveredName.isEmpty()) {
+            logger.debug("Resolved client {} as '{}' from {}", client.getMac(), discoveredName, source);
+        }
+        return updated;
     }
 
     private void replacePendingClientInboxDuplicates(ThingUID newThingUID, String hostname, String mac) {
@@ -289,7 +361,17 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
         if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed)) {
             return "";
         }
-        return trimmed.toLowerCase(Locale.ROOT);
+        return toHostname(trimmed);
+    }
+
+    static String toHostname(String value) {
+        String hostname = Normalizer.normalize(value.trim(), Normalizer.Form.NFKD).replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT).replaceAll("['’]", "").replaceAll("[^a-z0-9-]+", "-").replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+        if (hostname.length() > 63) {
+            hostname = hostname.substring(0, 63).replaceFirst("-+$", "");
+        }
+        return hostname;
     }
 
     private static String normalizeMac(String mac) {

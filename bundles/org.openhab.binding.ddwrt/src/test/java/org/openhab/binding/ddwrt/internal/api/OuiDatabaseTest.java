@@ -46,6 +46,22 @@ class OuiDatabaseTest {
     }
 
     @Test
+    void testUpdatedIeeeAssignments() {
+        assertThat(OuiDatabase.lookupVendor("3c:6a:d2:97:99:e2"), is(equalTo("TPLink")));
+        assertThat(OuiDatabase.lookupVendor("70:70:aa:cb:73:88"), is(equalTo("Amazon")));
+        assertThat(OuiDatabase.lookupVendor("74:ab:93:fe:fe:9c"), is(equalTo("Blink")));
+        assertThat(OuiDatabase.lookupVendor("c0:f8:53:54:c9:17"), is(equalTo("Tuya")));
+        assertThat(OuiDatabase.lookupVendor("f0:2f:9e:8c:e9:9e"), is(equalTo("Amazon")));
+    }
+
+    @Test
+    void testCurrentRokuAssignments() {
+        assertThat(OuiDatabase.lookupVendor("60:92:c8:98:73:6e"), is(equalTo("Roku")));
+        assertThat(OuiDatabase.lookupVendor("d0:4d:2c:11:22:33"), is(equalTo("Roku")));
+        assertThat(OuiDatabase.lookupVendor("8a:c7:2e:11:22:33"), is(equalTo("Roku")));
+    }
+
+    @Test
     void testLookupUnknownVendor() {
         assertThat(OuiDatabase.lookupVendor("ff:ff:ff:aa:bb:cc"), is(nullValue()));
     }
@@ -116,5 +132,11 @@ class OuiDatabaseTest {
     void testNonRandomizedMac0x00() {
         // 0x00 = 0000_0000 — globally unique
         assertThat(OuiDatabase.isRandomizedMac("00:17:f2:aa:bb:cc"), is(false));
+    }
+
+    @Test
+    void testVendorCidIsNotTreatedAsRandomized() {
+        // Roku's IEEE CID has the locally-administered bit set but identifies a vendor-managed address block.
+        assertThat(OuiDatabase.isRandomizedMac("8a:c7:2e:11:22:33"), is(false));
     }
 }

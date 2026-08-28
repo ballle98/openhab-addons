@@ -243,9 +243,13 @@ public class DDWRTNetworkCache {
     public void putWirelessClient(String mac, DDWRTClient client) {
         String normalizedMac = normalizeMac(mac);
         wirelessClientsByMac.put(normalizedMac, client);
-        // Maintain hostname index - include both hostname and ouiHostname
+        // Maintain indexes for the selected name and aliases used for identity matching.
         if (!client.getHostname().isEmpty()) {
             hostnameToMac.put(Objects.requireNonNull(client.getHostname().toLowerCase(Locale.ROOT)), normalizedMac);
+        }
+        if (!client.getPrimaryHostname().isEmpty() && !client.getPrimaryHostname().equals(client.getHostname())) {
+            hostnameToMac.put(Objects.requireNonNull(client.getPrimaryHostname().toLowerCase(Locale.ROOT)),
+                    normalizedMac);
         }
         if (!client.getOuiHostname().isEmpty() && !client.getOuiHostname().equals(client.getHostname())) {
             hostnameToMac.put(Objects.requireNonNull(client.getOuiHostname().toLowerCase(Locale.ROOT)), normalizedMac);
@@ -261,17 +265,26 @@ public class DDWRTNetworkCache {
         DDWRTClient result = Objects.requireNonNull(wirelessClientsByMac.compute(normalizeMac(mac), (key, existing) -> {
             DDWRTClient client = existing != null ? existing : new DDWRTClient(key);
             String previousHostname = client.getHostname();
+            String previousPrimaryHostname = client.getPrimaryHostname();
             String previousOuiHostname = client.getOuiHostname();
             DDWRTClient updated = mappingFunction.apply(client);
             if (!previousHostname.isEmpty() && !previousHostname.equalsIgnoreCase(updated.getHostname())) {
                 hostnameToMac.remove(previousHostname.toLowerCase(Locale.ROOT), key);
             }
+            if (!previousPrimaryHostname.isEmpty()
+                    && !previousPrimaryHostname.equalsIgnoreCase(updated.getPrimaryHostname())) {
+                hostnameToMac.remove(previousPrimaryHostname.toLowerCase(Locale.ROOT), key);
+            }
             if (!previousOuiHostname.isEmpty() && !previousOuiHostname.equalsIgnoreCase(updated.getOuiHostname())) {
                 hostnameToMac.remove(previousOuiHostname.toLowerCase(Locale.ROOT), key);
             }
-            // Maintain hostname index - include both hostname and ouiHostname
+            // Maintain indexes for the selected name and aliases used for identity matching.
             if (!updated.getHostname().isEmpty()) {
                 hostnameToMac.put(Objects.requireNonNull(updated.getHostname().toLowerCase(Locale.ROOT)), key);
+            }
+            if (!updated.getPrimaryHostname().isEmpty()
+                    && !updated.getPrimaryHostname().equals(updated.getHostname())) {
+                hostnameToMac.put(Objects.requireNonNull(updated.getPrimaryHostname().toLowerCase(Locale.ROOT)), key);
             }
             if (!updated.getOuiHostname().isEmpty() && !updated.getOuiHostname().equals(updated.getHostname())) {
                 hostnameToMac.put(Objects.requireNonNull(updated.getOuiHostname().toLowerCase(Locale.ROOT)), key);
@@ -329,7 +342,8 @@ public class DDWRTNetworkCache {
         String oldMac = hostnameToMac.get(hostname.toLowerCase(Locale.ROOT));
         if (oldMac != null && !oldMac.equals(normalizedNewMac)) {
             DDWRTClient oldClient = wirelessClientsByMac.get(oldMac);
-            if (oldClient != null && hostname.equalsIgnoreCase(oldClient.getHostname())) {
+            if (oldClient != null && (hostname.equalsIgnoreCase(oldClient.getHostname())
+                    || hostname.equalsIgnoreCase(oldClient.getPrimaryHostname()))) {
                 logger.debug("MAC randomization detected for '{}': old MAC={}, new MAC={}", hostname, oldMac,
                         normalizedNewMac);
 
@@ -359,6 +373,7 @@ public class DDWRTNetworkCache {
 
                 // Remove old entry and update hostname index
                 wirelessClientsByMac.remove(oldMac);
+                removeHostnameIndexes(oldClient, oldMac);
                 hostnameToMac.put(Objects.requireNonNull(hostname.toLowerCase(Locale.ROOT)), normalizedNewMac);
 
                 // Notify listeners under both old and new MAC, and hostname
@@ -383,10 +398,22 @@ public class DDWRTNetworkCache {
     }
 
     public void removeWirelessClient(String mac) {
-        DDWRTClient removed = wirelessClientsByMac.remove(normalizeMac(mac));
-        if (removed != null && !removed.getHostname().isEmpty()) {
-            // Only remove from hostname index if it still points to this MAC
-            hostnameToMac.remove(removed.getHostname().toLowerCase(Locale.ROOT), normalizeMac(mac));
+        String normalizedMac = normalizeMac(mac);
+        DDWRTClient removed = wirelessClientsByMac.remove(normalizedMac);
+        if (removed != null) {
+            removeHostnameIndexes(removed, normalizedMac);
+        }
+    }
+
+    private void removeHostnameIndexes(DDWRTClient client, String mac) {
+        if (!client.getHostname().isEmpty()) {
+            hostnameToMac.remove(client.getHostname().toLowerCase(Locale.ROOT), mac);
+        }
+        if (!client.getPrimaryHostname().isEmpty()) {
+            hostnameToMac.remove(client.getPrimaryHostname().toLowerCase(Locale.ROOT), mac);
+        }
+        if (!client.getOuiHostname().isEmpty()) {
+            hostnameToMac.remove(client.getOuiHostname().toLowerCase(Locale.ROOT), mac);
         }
     }
 

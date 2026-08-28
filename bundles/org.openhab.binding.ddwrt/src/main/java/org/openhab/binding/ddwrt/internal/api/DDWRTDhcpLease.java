@@ -32,6 +32,8 @@ public class DDWRTDhcpLease {
     private String hostname = "";
     private String ipAddress = "";
     private long expiry = 0;
+    private boolean staticAssignment;
+    private boolean staticHostname;
 
     public DDWRTDhcpLease(String mac) {
         this.mac = Objects.requireNonNull(mac.toLowerCase(Locale.ROOT).trim());
@@ -55,6 +57,14 @@ public class DDWRTDhcpLease {
         return expiry;
     }
 
+    public boolean isStaticAssignment() {
+        return staticAssignment;
+    }
+
+    public boolean hasStaticHostname() {
+        return staticHostname;
+    }
+
     // ---- Setters ----
 
     public void setHostname(String hostname) {
@@ -67,6 +77,14 @@ public class DDWRTDhcpLease {
 
     public void setExpiry(long expiry) {
         this.expiry = expiry;
+    }
+
+    public void setStaticAssignment(boolean staticAssignment) {
+        this.staticAssignment = staticAssignment;
+    }
+
+    public void setStaticHostname(boolean staticHostname) {
+        this.staticHostname = staticHostname;
     }
 
     @Override

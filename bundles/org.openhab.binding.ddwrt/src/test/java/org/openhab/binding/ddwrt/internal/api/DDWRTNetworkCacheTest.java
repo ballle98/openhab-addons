@@ -149,13 +149,44 @@ class DDWRTNetworkCacheTest {
     }
 
     @Test
-    void testDhcpHostnameOverridesDiscoveredHostname() {
+    void testDiscoveredHostnameOverridesDynamicDhcpHostname() {
         DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
-        client.setHostname("HS103");
+        client.setHostname("HS103", DDWRTClient.HostnameSource.DHCP);
         client.setDiscoveredHostname("Kitchen Lamp", "thing tplinksmarthome via mac");
 
-        assertThat(client.getHostname(), is(equalTo("HS103")));
+        assertThat(client.getHostname(), is(equalTo("Kitchen Lamp")));
         assertThat(client.getPrimaryHostname(), is(equalTo("HS103")));
+    }
+
+    @Test
+    void testIndexesDynamicDhcpAliasWhenDiscoverySuppliesFriendlyName() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("HS103", DDWRTClient.HostnameSource.DHCP);
+        client.setDiscoveredHostname("Kitchen Lamp", "thing tplinksmarthome via mac");
+        cache.putWirelessClient(client.getMac(), client);
+
+        assertThat(cache.getWirelessClientByHostname("HS103"), is(sameInstance(client)));
+        assertThat(cache.getWirelessClientByHostname("Kitchen Lamp"), is(sameInstance(client)));
+    }
+
+    @Test
+    void testStaticDhcpHostnameOverridesDiscoveredHostname() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("kitchen-switch", DDWRTClient.HostnameSource.STATIC_DHCP);
+        client.setDiscoveredHostname("Kitchen Lamp", "thing tplinksmarthome via mac");
+
+        assertThat(client.getHostname(), is(equalTo("kitchen-switch")));
+        assertThat(client.isHostnameAuthoritative(), is(true));
+    }
+
+    @Test
+    void testDynamicDhcpHostnameOverridesOuiFallback() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("HS103", DDWRTClient.HostnameSource.DHCP);
+        client.setOuiHostname("TPLink-ddeeff");
+
+        assertThat(client.getHostname(), is(equalTo("HS103")));
+        assertThat(client.isHostnameAuthoritative(), is(false));
     }
 
     @Test

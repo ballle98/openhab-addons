@@ -278,10 +278,10 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
     }
 
     private DDWRTClient enrichClientName(DDWRTNetworkCache cache, DDWRTClient client, ClientNameResolver nameResolver) {
-        // Router-provided names include explicit mappings, DHCP leases, and hosts-file entries. They are
-        // authoritative, so external discovery is only used when none of those sources supplied a name.
+        // Preserve administrator-assigned names while allowing trusted local discovery to replace generic dynamic
+        // DHCP names such as model numbers.
         Optional<ClientNameResolver.Resolution> resolution = Optional.empty();
-        if (client.getPrimaryHostname().isEmpty()) {
+        if (!client.isHostnameAuthoritative()) {
             String arpIp = Objects.requireNonNullElse(cache.getArpIp(client.getMac()), "");
             String verifiedIp = arpIp.equals(client.getIpAddress()) ? arpIp : "";
             resolution = nameResolver.resolve(client.getMac(), verifiedIp);

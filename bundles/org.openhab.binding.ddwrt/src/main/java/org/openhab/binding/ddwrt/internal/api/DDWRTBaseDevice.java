@@ -106,6 +106,8 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
     // Reusable MAC validation pattern for ARP/neighbor parsing
     protected static final Pattern MAC_PATTERN = Objects
             .requireNonNull(Pattern.compile("^[0-9a-f]{2}(:[0-9a-f]{2}){5}$"));
+    private static final Pattern STATIC_DHCP_MAC_PATTERN = Objects
+            .requireNonNull(Pattern.compile("(?i)(?<![0-9a-f:])([0-9a-f]{2}(?::[0-9a-f]{2}){5})(?![0-9a-f:])"));
 
     // Identity
     protected String mac = "";
@@ -1416,6 +1418,16 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
             return;
         }
 
+        Map<String, String> staticDhcpAssignments = parseStaticDhcpAssignments(safeTrim(
+                runner.execStdout("{ grep -sh '^dhcp-host=' /tmp/dnsmasq.conf /var/etc/dnsmasq.conf* 2>/dev/null; "
+                        + "grep -sh '^dhcp-hostsfile=' /tmp/dnsmasq.conf /var/etc/dnsmasq.conf* 2>/dev/null "
+                        + "| cut -d= -f2- | while IFS= read -r file; do cat \"$file\" 2>/dev/null; done; "
+                        + "for pid in $(pidof dnsmasq 2>/dev/null); do "
+                        + "tr '\\0' '\\n' 2>/dev/null < \"/proc/$pid/cmdline\" "
+                        + "| sed -n 's/^--dhcp-host=/dhcp-host=/p'; "
+                        + "tr '\\0' '\\n' 2>/dev/null < \"/proc/$pid/cmdline\" " + "| sed -n 's/^--dhcp-hostsfile=//p' "
+                        + "| while IFS= read -r file; do cat \"$file\" 2>/dev/null; done; done; }")));
+
         // Clear existing leases before re-parsing so stale entries are removed
         cache.clearDhcpLeases();
 
@@ -1432,6 +1444,11 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                 String hostname = Objects.requireNonNull(parts[3]);
                 if ("*".equals(hostname)) {
                     hostname = "";
+                }
+                String configuredHostname = Objects.requireNonNullElse(staticDhcpAssignments.get(leaseMac), "");
+                boolean staticHostname = !configuredHostname.isEmpty();
+                if (staticHostname) {
+                    hostname = configuredHostname;
                 }
 
                 long expiry = 0;
@@ -1457,11 +1474,17 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
 
                 final String finalHostname = hostname;
                 final String finalIp = ip;
+                DDWRTNetwork net = network;
+                String mappedHostname = net != null
+                        ? Objects.requireNonNullElse(net.resolveHostname(leaseMac, finalIp), "")
+                        : "";
 
                 DDWRTDhcpLease lease = new DDWRTDhcpLease(Objects.requireNonNull(leaseMac));
                 lease.setIpAddress(finalIp);
                 lease.setHostname(finalHostname);
                 lease.setExpiry(expiry);
+                lease.setStaticAssignment(staticDhcpAssignments.containsKey(leaseMac));
+                lease.setStaticHostname(staticHostname);
                 cache.putDhcpLease(Objects.requireNonNull(leaseMac), lease);
 
                 // Handle MAC randomization: if this hostname exists under a different MAC, merge
@@ -1480,11 +1503,15 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                 // Thread-safe update existing wireless client with DHCP info
                 cache.computeWirelessClient(leaseMac, client -> {
                     boolean changed = false;
-                    // Set hostname if: (1) hostname field is empty, or (2) hostname differs from new hostname
-                    // This allows DHCP to override OUI hostnames when better info becomes available
-                    if (!finalHostname.isEmpty()
-                            && (client.getHostname().isEmpty() || !finalHostname.equals(client.getHostname()))) {
-                        client.setHostname(finalHostname);
+                    DDWRTClient.HostnameSource source = staticHostname ? DDWRTClient.HostnameSource.STATIC_DHCP
+                            : DDWRTClient.HostnameSource.DHCP;
+                    String effectiveHostname = !mappedHostname.isEmpty() ? mappedHostname : finalHostname;
+                    if (!mappedHostname.isEmpty()) {
+                        source = DDWRTClient.HostnameSource.USER_MAPPING;
+                    }
+                    if (!effectiveHostname.isEmpty() && (!effectiveHostname.equals(client.getPrimaryHostname())
+                            || source != client.getHostnameSource())) {
+                        client.setHostname(effectiveHostname, source);
                         changed = true;
                     }
                     if (!finalIp.isEmpty() && !finalIp.equals(client.getIpAddress())) {
@@ -1501,6 +1528,39 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
         }
         dhcpLeasesCacheValid = true;
         logger.debug("Refreshed DHCP leases: {} entries", cache.getDhcpLeases().size());
+    }
+
+    static Map<String, String> parseStaticDhcpAssignments(String output) {
+        Map<String, String> assignments = new ConcurrentHashMap<>();
+        for (String line : output.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int comment = trimmed.indexOf('#');
+            if (comment >= 0) {
+                trimmed = trimmed.substring(0, comment).trim();
+            }
+            if (trimmed.startsWith("dhcp-host=")) {
+                trimmed = trimmed.substring("dhcp-host=".length());
+            }
+            String hostname = "";
+            for (String value : trimmed.split(",")) {
+                String candidate = value.trim();
+                if (candidate.matches("(?i)[a-z0-9](?:[a-z0-9_.-]*[a-z0-9])?")
+                        && !candidate.matches("(?i)(?:ignore|infinite|broadcast|[0-9]+[smhdw]?)")
+                        && !candidate.startsWith("id:") && !candidate.startsWith("set:")
+                        && !candidate.startsWith("tag:") && !candidate.startsWith("net:")
+                        && !candidate.matches("[0-9.]+")) {
+                    hostname = candidate;
+                }
+            }
+            Matcher matcher = STATIC_DHCP_MAC_PATTERN.matcher(trimmed);
+            while (matcher.find()) {
+                assignments.put(Objects.requireNonNull(matcher.group(1)).toLowerCase(Locale.ROOT), hostname);
+            }
+        }
+        return assignments;
     }
 
     /**
@@ -1652,7 +1712,7 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
 
                         // Do not use getHostname() here; it may return an OUI-generated fallback.
                         if (client.getPrimaryHostname().isEmpty()) {
-                            client.setHostname(hostname);
+                            client.setHostname(hostname, DDWRTClient.HostnameSource.REVERSE_DNS);
                         }
                         // Cache hostname index is maintained by putWirelessClient
                         cache.putWirelessClient(client.getMac(), client);
@@ -1711,12 +1771,14 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                     // Populate hostname and IP from DHCP lease
                     // Try MAC-based lookup first, then hostname-based (handles MAC randomization)
                     DDWRTDhcpLease lease = cache.getDhcpLease(clientMac);
-                    if (lease == null && !client.getHostname().isEmpty()) {
-                        lease = cache.getDhcpLeaseByHostname(client.getHostname());
+                    if (lease == null && !client.getPrimaryHostname().isEmpty()) {
+                        lease = cache.getDhcpLeaseByHostname(client.getPrimaryHostname());
                     }
                     if (lease != null) {
                         if (!lease.getHostname().isEmpty()) {
-                            client.setHostname(lease.getHostname());
+                            client.setHostname(lease.getHostname(),
+                                    lease.hasStaticHostname() ? DDWRTClient.HostnameSource.STATIC_DHCP
+                                            : DDWRTClient.HostnameSource.DHCP);
                         }
                         if (!lease.getIpAddress().isEmpty()) {
                             client.setIpAddress(lease.getIpAddress());
@@ -1724,12 +1786,12 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                     }
 
                     // If still no hostname, try to resolve from cached /etc/hosts (only on gateway/DNS servers)
-                    if (client.getHostname().isEmpty() && isGateway()) {
+                    if (!client.isHostnameAuthoritative() && isGateway()) {
                         // Try by IP address if we have it
                         if (!client.getIpAddress().isEmpty()) {
                             String hostsEntry = hostsCache.get(client.getIpAddress());
                             if (hostsEntry != null && !hostsEntry.isEmpty()) {
-                                client.setHostname(hostsEntry);
+                                client.setHostname(hostsEntry, DDWRTClient.HostnameSource.HOSTS_FILE);
                                 logger.debug("Resolved hostname for {} from cached /etc/hosts: {}", clientMac,
                                         hostsEntry);
                             }
@@ -1745,25 +1807,25 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
                         }
                     }
 
-                    // Try user-supplied hostname mappings (files + inline config)
-                    if (client.getHostname().isEmpty()) {
-                        DDWRTNetwork net = network;
-                        if (net != null) {
-                            String resolved = net.resolveHostname(clientMac, client.getIpAddress());
-                            if (resolved != null && !resolved.isEmpty()) {
-                                client.setHostname(resolved);
-                                logger.debug("Resolved hostname for {} from user mappings: {}", clientMac, resolved);
-                            }
+                    // User mappings are explicit and take precedence over names learned from the router.
+                    DDWRTNetwork net = network;
+                    if (net != null) {
+                        String resolved = net.resolveHostname(clientMac, client.getIpAddress());
+                        if (resolved != null && !resolved.isEmpty()) {
+                            client.setHostname(resolved, DDWRTClient.HostnameSource.USER_MAPPING);
+                            logger.debug("Resolved hostname for {} from user mappings: {}", clientMac, resolved);
                         }
                     }
 
                     // For randomized MACs with an IP but no hostname, try reverse DHCP lookup
                     // (handles SSID roaming where the phone keeps its IP but changes MAC)
-                    if (client.getHostname().isEmpty() && !client.getIpAddress().isEmpty()
+                    if (client.getPrimaryHostname().isEmpty() && !client.getIpAddress().isEmpty()
                             && OuiDatabase.isRandomizedMac(clientMac)) {
                         DDWRTDhcpLease ipLease = cache.getDhcpLeaseByIp(client.getIpAddress());
                         if (ipLease != null && !ipLease.getHostname().isEmpty()) {
-                            client.setHostname(ipLease.getHostname());
+                            client.setHostname(ipLease.getHostname(),
+                                    ipLease.hasStaticHostname() ? DDWRTClient.HostnameSource.STATIC_DHCP
+                                            : DDWRTClient.HostnameSource.DHCP);
                             logger.debug("Resolved hostname for randomized MAC {} via DHCP IP {}: {}", clientMac,
                                     client.getIpAddress(), ipLease.getHostname());
                         }
@@ -1771,10 +1833,10 @@ public abstract class DDWRTBaseDevice implements SyslogListener {
 
                     // For randomized MACs still without a hostname, try the thing-handler hint map
                     // (handles per-SSID MAC randomization where DHCP doesn't include the hostname)
-                    if (client.getHostname().isEmpty() && OuiDatabase.isRandomizedMac(clientMac)) {
+                    if (client.getPrimaryHostname().isEmpty() && OuiDatabase.isRandomizedMac(clientMac)) {
                         String hintHostname = cache.getHostnameHintForMac(clientMac);
                         if (hintHostname != null && !hintHostname.isEmpty()) {
-                            client.setHostname(hintHostname);
+                            client.setHostname(hintHostname, DDWRTClient.HostnameSource.HINT);
                             logger.debug("Resolved hostname for randomized MAC {} via thing-handler hint: {}",
                                     clientMac, hintHostname);
                         }

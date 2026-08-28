@@ -38,13 +38,22 @@ Discovery results appear in the openHAB inbox after each device refresh cycle.
 
 ### Client Name Enrichment
 
-When a router does not provide a client hostname, the binding can use a name learned from another openHAB Thing or
-from local-network discovery. Exact MAC-address matches are preferred; IP-address matches are only used when the
-router's current ARP entry confirms the association and the discovered name is unambiguous.
+The binding can enrich generic dynamic DHCP names with a friendlier name learned from another openHAB Thing or from
+local-network discovery. Exact MAC-address matches are preferred; IP-address matches are only used when the router's
+current ARP entry confirms the association and the discovered name is unambiguous.
 
 The binding also collects names advertised by legacy TP-Link/Kasa UDP discovery, selected mDNS services (including
-Apple and Fire TV devices), and WeMo UPnP devices. Router-provided names and explicit `hostnameMappings` always take
-precedence. An OUI-based name such as `TPLink-a3a012` remains the final fallback for a globally assigned MAC address.
+Apple and Fire TV devices), and WeMo UPnP devices. Names use the following precedence:
+
+1. An explicit `hostnameMappings` entry or static dnsmasq assignment
+1. Exact-MAC discovery
+1. ARP-verified mDNS/UPnP discovery
+1. A dynamic DHCP hostname
+1. An OUI-based name such as `TPLink-a3a012` for a globally assigned MAC address
+
+Static assignments are detected from effective dnsmasq `dhcp-host` entries and referenced `dhcp-hostsfile` files,
+including OpenWrt's equivalent `--dhcp-host` and `--dhcp-hostsfile` process arguments. DHCP client IDs are not used to
+infer whether a lease is static.
 
 Friendly names containing spaces or punctuation are retained as inbox labels. The required `hostname` property is
 converted to a lowercase DNS-safe label, for example `Jack's Living Room TV` becomes `jacks-living-room-tv`.

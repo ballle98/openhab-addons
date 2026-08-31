@@ -33,11 +33,15 @@ import org.openhab.binding.ddwrt.internal.api.DDWRTNetwork;
 import org.openhab.binding.ddwrt.internal.api.DDWRTNetworkCache;
 import org.openhab.binding.ddwrt.internal.api.RefreshListener;
 import org.openhab.binding.ddwrt.internal.handler.DDWRTNetworkBridgeHandler;
+import org.openhab.core.common.registry.RegistryChangeListener;
 import org.openhab.core.config.discovery.AbstractThingHandlerDiscoveryService;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.inbox.Inbox;
+import org.openhab.core.config.discovery.inbox.InboxListener;
+import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingRegistry;
+import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.ThingUID;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -53,7 +57,7 @@ import org.slf4j.LoggerFactory;
 @Component(scope = ServiceScope.PROTOTYPE, service = DDWRTDiscoveryService.class)
 @NonNullByDefault
 public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<DDWRTNetworkBridgeHandler>
-        implements RefreshListener {
+        implements InboxListener, RefreshListener, RegistryChangeListener<Thing> {
 
     private static final int DISCOVERY_TIMEOUT_SECONDS = 120;
     private static final int BACKGROUND_DISCOVERY_INITIAL_DELAY_SECONDS = 10;
@@ -61,6 +65,7 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
 
     private final Logger logger = LoggerFactory.getLogger(DDWRTDiscoveryService.class);
 
+    private volatile boolean backgroundDiscoveryActive;
     private @Nullable ScheduledFuture<?> backgroundDiscoveryJob;
     private @Nullable ScheduledFuture<?> refreshTriggeredScan;
 
@@ -98,43 +103,109 @@ public class DDWRTDiscoveryService extends AbstractThingHandlerDiscoveryService<
     @Override
     protected void startBackgroundDiscovery() {
         logger.debug("Starting DD-WRT background discovery");
+        boolean registerListeners = !backgroundDiscoveryActive;
+        backgroundDiscoveryActive = true;
         ScheduledFuture<?> job = backgroundDiscoveryJob;
         if (job == null || job.isCancelled()) {
             backgroundDiscoveryJob = scheduler.scheduleWithFixedDelay(this::startScan,
                     BACKGROUND_DISCOVERY_INITIAL_DELAY_SECONDS, DISCOVERY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         }
-        // Register as refresh listener so discovery runs immediately after device refresh
-        DDWRTNetwork net = thingHandler.getNetwork();
-        if (net != null) {
-            net.addRefreshListener(this);
+        if (registerListeners) {
+            DDWRTNetwork net = thingHandler.getNetwork();
+            if (net != null) {
+                net.addRefreshListener(this);
+            }
+            Inbox inboxRef = inbox;
+            if (inboxRef != null) {
+                inboxRef.addInboxListener(this);
+            }
+            ThingRegistry registryRef = thingRegistry;
+            if (registryRef != null) {
+                registryRef.addRegistryChangeListener(this);
+            }
         }
     }
 
     @Override
     protected void stopBackgroundDiscovery() {
         logger.debug("Stopping DD-WRT background discovery");
+        backgroundDiscoveryActive = false;
+        DDWRTNetwork net = thingHandler.getNetwork();
+        if (net != null) {
+            net.removeRefreshListener(this);
+        }
+        Inbox inboxRef = inbox;
+        if (inboxRef != null) {
+            inboxRef.removeInboxListener(this);
+        }
+        ThingRegistry registryRef = thingRegistry;
+        if (registryRef != null) {
+            registryRef.removeRegistryChangeListener(this);
+        }
         ScheduledFuture<?> job = backgroundDiscoveryJob;
         if (job != null) {
             job.cancel(true);
             backgroundDiscoveryJob = null;
         }
-        ScheduledFuture<?> pending = refreshTriggeredScan;
-        if (pending != null) {
-            pending.cancel(false);
-            refreshTriggeredScan = null;
-        }
-        // Unregister refresh listener
-        DDWRTNetwork net = thingHandler.getNetwork();
-        if (net != null) {
-            net.removeRefreshListener(this);
+        synchronized (this) {
+            ScheduledFuture<?> pending = refreshTriggeredScan;
+            if (pending != null) {
+                pending.cancel(false);
+                refreshTriggeredScan = null;
+            }
         }
     }
 
     @Override
     public void onRefreshComplete(DDWRTBaseDevice device) {
-        // Debounce: schedule a scan 2s from now, replacing any pending scan.
-        // This coalesces rapid refresh events (e.g., multiple devices refreshing)
-        // into a single discovery scan.
+        scheduleRefreshTriggeredScan();
+    }
+
+    @Override
+    public void thingAdded(Inbox source, DiscoveryResult result) {
+        identityChanged(result.getThingTypeUID());
+    }
+
+    @Override
+    public void thingUpdated(Inbox source, DiscoveryResult result) {
+        identityChanged(result.getThingTypeUID());
+    }
+
+    @Override
+    public void thingRemoved(Inbox source, DiscoveryResult result) {
+        identityChanged(result.getThingTypeUID());
+    }
+
+    @Override
+    public void added(Thing element) {
+        identityChanged(element.getThingTypeUID());
+    }
+
+    @Override
+    public void updated(Thing oldElement, Thing element) {
+        identityChanged(element.getThingTypeUID());
+    }
+
+    @Override
+    public void removed(Thing element) {
+        identityChanged(element.getThingTypeUID());
+    }
+
+    private void identityChanged(ThingTypeUID thingTypeUID) {
+        if (isExternalIdentity(thingTypeUID)) {
+            scheduleRefreshTriggeredScan();
+        }
+    }
+
+    static boolean isExternalIdentity(ThingTypeUID thingTypeUID) {
+        return !THING_TYPE_CLIENT.getBindingId().equals(thingTypeUID.getBindingId());
+    }
+
+    private synchronized void scheduleRefreshTriggeredScan() {
+        if (!backgroundDiscoveryActive) {
+            return;
+        }
+        // Coalesce rapid device refreshes and batches of registry changes into one discovery scan.
         ScheduledFuture<?> pending = refreshTriggeredScan;
         if (pending != null) {
             pending.cancel(false);

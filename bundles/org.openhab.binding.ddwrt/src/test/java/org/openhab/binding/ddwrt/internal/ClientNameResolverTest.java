@@ -75,6 +75,18 @@ class ClientNameResolverTest {
     }
 
     @Test
+    void prefersTapoAliasPropertyOverPresentationLabel() {
+        ClientNameResolver resolver = new ClientNameResolver();
+        resolver.addIdentity("Tapo HS220 Light-Switch",
+                Map.of("macAddress", "24-2F-D0-00-00-00", "alias", "Dining Room Dimmer"),
+                "thing tapocontrol:HS220:bridge:242FD0000000", "tapocontrol");
+
+        ClientNameResolver.Resolution resolution = resolver.resolve("24:2f:d0:00:00:00", "").orElseThrow();
+
+        assertThat(resolution.name(), is("Dining Room Dimmer"));
+    }
+
+    @Test
     void preservesParenthesizedAliasFromOtherBindings() {
         ClientNameResolver resolver = new ClientNameResolver();
         resolver.addIdentity("Switch (West)", Map.of("macAddress", "D8-07-B6-AC-65-5A"), "inbox another:device:id",

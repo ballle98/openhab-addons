@@ -37,6 +37,7 @@ final class ClientNameResolver {
 
     private static final Set<String> MAC_KEYS = Set.of("mac", "macaddress", "mac-address", "mac_address");
     private static final Set<String> IP_KEYS = Set.of("ip", "ipaddress", "ip-address", "ip_address", "host");
+    private static final Set<String> TAPO_ALIAS_KEYS = Set.of("alias", "nickname");
     private static final Set<String> GENERIC_NAMES = Set.of("device", "unknown", "unknown device", "wemo device");
     private static final String TAPO_BINDING_ID = "tapocontrol";
 
@@ -76,7 +77,7 @@ final class ClientNameResolver {
     void addIdentity(@Nullable String label, Map<String, ?> properties, String source, String bindingId) {
         String mac = findNormalizedProperty(properties, MAC_KEYS, ClientNameResolver::normalizeMac);
         String ip = findNormalizedProperty(properties, IP_KEYS, ClientNameResolver::normalizeIp);
-        String name = normalizeName(label, ip, mac, bindingId);
+        String name = normalizeName(label, properties, ip, mac, bindingId);
         if (name.isEmpty()) {
             return;
         }
@@ -134,14 +135,16 @@ final class ClientNameResolver {
                 : Optional.empty();
     }
 
-    private static String normalizeName(@Nullable String label, String ip, String mac, String bindingId) {
+    private static String normalizeName(@Nullable String label, Map<String, ?> properties, String ip, String mac,
+            String bindingId) {
         if (label == null) {
             return "";
         }
 
         String name = label.trim();
         if (TAPO_BINDING_ID.equals(bindingId)) {
-            name = unwrapTapoAlias(name);
+            String alias = findNormalizedProperty(properties, TAPO_ALIAS_KEYS, String::trim);
+            name = name.startsWith("Tapo ") && !alias.isEmpty() ? alias : unwrapTapoAlias(name);
         }
         if (!ip.isEmpty() && name.endsWith(" (" + ip + ")")) {
             name = name.substring(0, name.length() - ip.length() - 3).trim();
@@ -154,8 +157,9 @@ final class ClientNameResolver {
     }
 
     /**
-     * Tapo Control presents discovery labels as "Tapo &lt;model&gt; &lt;type&gt; (&lt;alias&gt;)" without exposing the
-     * alias as a property. Keep the user-assigned alias and discard the presentation prefix.
+     * Tapo Control may present labels as "Tapo &lt;model&gt; &lt;type&gt; (&lt;alias&gt;)". Extract the alias when no
+     * explicit
+     * alias property is available.
      */
     private static String unwrapTapoAlias(String label) {
         int aliasStart = label.lastIndexOf(" (");

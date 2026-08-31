@@ -18,6 +18,7 @@ import static org.hamcrest.Matchers.is;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.junit.jupiter.api.Test;
 import org.openhab.binding.ddwrt.internal.api.DDWRTRadio;
+import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.ThingUID;
 
 /**
@@ -49,5 +50,11 @@ class DDWRTDiscoveryServiceTest {
     @Test
     void limitsHostnameToOneDnsLabel() {
         assertThat(DDWRTDiscoveryService.toHostname("A".repeat(70)).length(), is(63));
+    }
+
+    @Test
+    void refreshesForExternalThingIdentityChangesOnly() {
+        assertThat(DDWRTDiscoveryService.isExternalIdentity(new ThingTypeUID("tplinksmarthome", "hs220")), is(true));
+        assertThat(DDWRTDiscoveryService.isExternalIdentity(DDWRTBindingConstants.THING_TYPE_CLIENT), is(false));
     }
 }

@@ -42,12 +42,4 @@ class MdnsClientNameDiscoveryTest {
 
         assertThat(MdnsClientNameDiscovery.extractName(info), is("Lees iPhone"));
     }
-
-    @Test
-    void readsAdvertisedMacProperty() {
-        ServiceInfo info = ServiceInfo.create("_amzn-wplay._tcp.local.", "Living Room Fire TV", 8009, 0, 0,
-                java.util.Map.of("mac", "11:22:33:44:55:66"));
-
-        assertThat(MdnsClientNameDiscovery.extractMac(info), is("112233445566"));
-    }
 }

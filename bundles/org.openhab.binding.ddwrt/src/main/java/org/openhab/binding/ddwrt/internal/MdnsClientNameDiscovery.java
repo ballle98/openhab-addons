@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public class MdnsClientNameDiscovery implements ServiceListener {
 
     static final Set<String> SERVICE_TYPES = Set.of("_device-info._tcp.local.", "_apple-mobdev2._tcp.local.",
-            "_companion-link._tcp.local.", "_airplay._tcp.local.", "_raop._tcp.local.", "_amzn-wplay._tcp.local.");
+            "_companion-link._tcp.local.", "_airplay._tcp.local.", "_raop._tcp.local.");
 
     private final Logger logger = LoggerFactory.getLogger(MdnsClientNameDiscovery.class);
     private final ClientNameRegistry nameRegistry;

@@ -42,12 +42,11 @@ The binding can enrich generic dynamic DHCP names with a friendlier name learned
 local-network discovery. Exact MAC-address matches are preferred; IP-address matches are only used when the router's
 current ARP entry confirms the association and the discovered name is unambiguous.
 
-The binding also collects names advertised by legacy TP-Link/Kasa UDP discovery, selected mDNS services (including
-Apple and Fire TV devices), and WeMo UPnP devices. Names use the following precedence:
+The binding also collects names advertised by selected Apple mDNS services. Names use the following precedence:
 
 1. An explicit `hostnameMappings` entry or static dnsmasq assignment
 1. Exact-MAC discovery
-1. ARP-verified mDNS/UPnP discovery
+1. ARP-verified discovery from another binding or mDNS
 1. A dynamic DHCP hostname
 1. An OUI-based name such as `TPLink-a3a012` for a globally assigned MAC address
 

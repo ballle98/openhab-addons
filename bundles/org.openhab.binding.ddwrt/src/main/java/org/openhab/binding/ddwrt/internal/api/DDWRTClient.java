@@ -25,12 +25,35 @@ import org.eclipse.jdt.annotation.Nullable;
  * transport changes.
  *
  * @author Lee Ballard - Initial contribution
+ * @author Lee Ballard - Hostname source tracking
  */
 @NonNullByDefault
 public class DDWRTClient {
 
+    public enum HostnameSource {
+        NONE(false),
+        DHCP(false),
+        REVERSE_DNS(false),
+        HINT(false),
+        STATIC_DHCP(true),
+        HOSTS_FILE(true),
+        USER_MAPPING(true),
+        UNKNOWN(true);
+
+        private final boolean authoritative;
+
+        HostnameSource(boolean authoritative) {
+            this.authoritative = authoritative;
+        }
+
+        public boolean isAuthoritative() {
+            return authoritative;
+        }
+    }
+
     private String mac;
     private String hostname = "";
+    private HostnameSource hostnameSource = HostnameSource.NONE;
     private String ouiHostname = "";
     private String ipAddress = "";
     private String apMac = "";
@@ -61,6 +84,14 @@ public class DDWRTClient {
 
     public String getPrimaryHostname() {
         return hostname;
+    }
+
+    public HostnameSource getHostnameSource() {
+        return hostnameSource;
+    }
+
+    public boolean isHostnameAuthoritative() {
+        return !hostname.isEmpty() && hostnameSource.isAuthoritative();
     }
 
     public String getOuiHostname() {
@@ -128,7 +159,12 @@ public class DDWRTClient {
     }
 
     public void setHostname(String hostname) {
+        setHostname(hostname, HostnameSource.UNKNOWN);
+    }
+
+    public void setHostname(String hostname, HostnameSource source) {
         this.hostname = hostname;
+        hostnameSource = hostname.isEmpty() ? HostnameSource.NONE : source;
     }
 
     public void setOuiHostname(String ouiHostname) {

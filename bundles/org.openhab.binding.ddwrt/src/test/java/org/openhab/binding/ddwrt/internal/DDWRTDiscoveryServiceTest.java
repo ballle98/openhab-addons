@@ -42,13 +42,31 @@ class DDWRTDiscoveryServiceTest {
     }
 
     @Test
-    void routerHostnameTakesPrecedenceOverExternalName() {
+    void staticRouterHostnameTakesPrecedenceOverExternalName() {
         DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
-        client.setHostname("router-name");
+        client.setHostname("router-name", DDWRTClient.HostnameSource.STATIC_DHCP);
         ClientNameResolver resolver = new ClientNameResolver();
         resolver.addIdentity("External Name", java.util.Map.of("mac", client.getMac()));
 
         assertThat(DDWRTDiscoveryService.selectClientName(client, resolver), is("router-name"));
+    }
+
+    @Test
+    void exactMacNameTakesPrecedenceOverDynamicDhcpName() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("HS103", DDWRTClient.HostnameSource.DHCP);
+        ClientNameResolver resolver = new ClientNameResolver();
+        resolver.addIdentity("Kitchen Lamp", java.util.Map.of("mac", client.getMac()));
+
+        assertThat(DDWRTDiscoveryService.selectClientName(client, resolver), is("Kitchen Lamp"));
+    }
+
+    @Test
+    void dynamicDhcpNameIsRetainedWithoutExactMacName() {
+        DDWRTClient client = new DDWRTClient("aa:bb:cc:dd:ee:ff");
+        client.setHostname("HS103", DDWRTClient.HostnameSource.DHCP);
+
+        assertThat(DDWRTDiscoveryService.selectClientName(client, new ClientNameResolver()), is("HS103"));
     }
 
     @Test
